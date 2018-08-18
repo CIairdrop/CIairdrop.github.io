@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Ether Batch Transfer</title>
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+    crossorigin="anonymous">
+</head>
+
+<body>
+<!-- header -->
+<div id="header">
+    <div id="slogan">by @Crypto_Investor</div>
+
+    <div id="logo"><a href="#">Ether&Token Batch Transfer Machine</a></div>
+
+    <div id="menu">
+        <ul>
+            <li class="active"><a href="#">免费ETH批量发送</a></li>
+            <li><a href="#">ETH批量发送定制</a></li>
+            <li><a href="#">ERC20代币批量发送</a></li>
+            <li><a href="#">FAQ</a></li>
+        </ul>
+    </div>
+</div>
+<!-- end header -->
+<!-- main -->
+<div id="main">
+
+
+    <div id="text">
+        <h1>批量发送以太币(免费版本)</h1>
+        <p>这个工具通过智能合约,给多个地址批量发送以太币。每个地址将获得等量的以太币</p>
+        <p>如果需要批量发送自定义数目的以太币给不同地址，请使用<a>定制版发送工具</a></p>
+        <p>当目前为止，这个工具已经成功批量发送 <b><span id="totalEtherSent"></span></b>个 以太币</p>
+        <a id="contractAddress"> 可以在Etherscan上找到这个合约 </a>
+        
+        <h2>第一步:导入要发送的所有地址(csv)</h2>
+        <div style="border: blue; margin-bottom: 10px">
+                <input type="file" name="filename" id="filename" style="text-align: center">
+                <button id="upload" onClick="upload()">upload</button>
+        </div>
+        <div>
+            <p>
+                <span style="color:brown;" id="csvLoad"></span>
+            </p>
+        </div>
+
+        <h2>第二步:选择要发送的以太币总量</h2>
+        <input type="text" id="amount" placeholder="0" style="margin-bottom: 10px"> ETH
+        <div>
+            <button type="button" id="button1" onClick="distribute()">Distribute</button>
+        </div>
+    </div>
+
+    <table class="table table-striped table-hover" id="here_table" style="margin:30px">
+            <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col"> 以太坊地址</th>
+                    <th scope="col"> 有效地址认证</th>
+                </tr>
+            </thead>
+            <tbody id="tbody">
+            </tbody>
+    </table>
+
+</div>
+<!-- end main -->
+
+<!-- footer -->
+    <div id="footer">
+        <div id="footer_left">
+            <p>如果需要智能合约解决方案或者定制智能合约,请发送私信至微博@Crypto_Investor</p>
+            <p>捐赠地址:0xACcb02cd5d0fF27858Ed279c676bE242d1431BDe</p>
+        </div>
+    </div>
+
+</div>
+<!-- end footer -->
+
+
+<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+<script src="./common.js"></script>
+<script src="./ethBTFree_ABI.js"></script>
+<script>
+        var MyContract = web3.eth.contract(CONTRACT_ABI);
+        var contractInstance = MyContract.at(CONTRACT_1_ADDRESSES);
+        var accounts = web3.eth.accounts;
+        $("#contractAddress").attr('href', explorer + CONTRACT_1_ADDRESSES).attr("target", "_blank");
+
+        window.addEventListener('load', function () {
+            // Checking if Web3 has been injected by the browser (Mist/MetaMask)
+            if (typeof web3 !== 'undefined') {
+                // Use Mist/MetaMask's provider    
+                if (web3.version.network == "1") {
+                    web3 = new Web3(web3.currentProvider);
+                }
+                else (
+                    alert("请先切换到以太网主网")
+                )
+            }
+            else {
+                Alert('请先安装Metamask插件')
+                // fallback - use your fallback strategy (local node / hosted node + in-dapp id mgmt / fail)
+            }
+        })
+
+        contractInstance.totalEther.call({
+            from: accounts[0]
+            }, 
+            function (err, amount) {
+                    $("#totalEtherSent").text(web3.fromWei(amount, 'ether'));
+            })
+
+        var csvResult;
+        var isVerified;
+        var readytoTransfer;
+        function upload() {
+            $("#txstatus").val();
+            var csv = $('#filename');
+            var csvFile = csv[0].files[0];
+            var ext = csv.val().split(".").pop().toLowerCase();
+            if ($.inArray(ext, ["csv"]) === -1) {
+                alert('not CSV file');
+                return false;
+            }
+            if (csvFile != undefined) {
+                reader = new FileReader();
+                reader.onload = function (e) {
+                    $("#csvLoad").text("");
+                    csvResult = e.target.result.split(/\r|\n|\r/);
+
+                    // remove all the empty result
+                    for (var i = 0; i < csvResult.length; i++) {
+                        if (csvResult[i] == "") {
+                            csvResult.splice(i, 1);
+                            i--;
+                        }
+                    }
+                    showAddress(csvResult);
+                }
+                reader.readAsText(csvFile);
+            }
+        }
+
+        function showAddress(address) {
+                $("#tbody").empty();
+                table_idx = 0;
+                var statuses = new Array(address.length);
+
+                for (i = 0; i < address.length; i++) {
+                    if (web3.isAddress(address[i])) {
+                        isVerified = "Yes"
+                        statuses[i] = true;
+                    }
+                    else {
+                        isVerified = "No"
+                        statuses[i] = false;
+                    }
+                    console.log(isVerified)
+
+                    $('#here_table').append('<tr><th scope="row">' + table_idx + '</th>' + '<td>' + '<a target=_blank href=' + explorer + address[i] + '>' + address[i] + '</a>' + '</td>' + '<td>' + isVerified + '</td></tr>');
+                    table_idx++;
+                }
+
+
+                if (statuses.every(element => element === true)) {
+                    $("#csvLoad").text("Great! all addresses are verified. Ready to batch transfer");
+                    readytoTransfer = true;
+                }
+                else {
+                    $("#csvLoad").text("Sorry, some of your addresses do not look right")
+                    readytoTransfer = false;
+                }
+            }
+
+
+
+        var txhash;
+        async function distribute() {
+
+                $("#txstatus").text("");
+
+                // check if all the addresses are valid
+                showAddress(csvResult);
+                if (readytoTransfer === false) {
+                    alert("Some of your addresses do not look right");
+                    return
+                }
+
+                var amount = $('#amount').val().trim();
+                //
+                // check amount
+                if (isNaN(amount)) {
+                    alert("The amount you send is NOT a number!");
+                    return false;
+                }
+
+                if (amount <= 0) {
+                    alert("The amount you send needs to be more than zero!");
+                    return false;
+                }
+
+                var addresses = csvResult;
+
+                console.log(amount)
+                contractInstance.distribute.sendTransaction(addresses, {
+                    from: accounts[0],
+                    value: web3.toWei(amount, 'ether')
+                }, function (err, result) {
+                    if (err) {
+                        console.log(err)
+                    }
+                    else {
+                        spin();
+                        txhash = result;
+                        setQuery = setInterval(function () {
+                            setTxQuery();
+                        }, 10000);
+                        $("#txonexplorer").text("check your transaction here").attr("href", explorerTx + txhash).attr("target", "_blank")
+                    }
+                })
+            }
+
+            function setTxQuery() {
+                web3.eth.getTransactionReceipt(txhash, function (err, receipt) {
+                    if (err) {
+                        console.log(err);
+                        stopSpin();
+                        $("#txstatus").text("Something is wrong")
+                    } else {
+                        console.log(receipt);
+                        if (receipt) { // get receipt
+                            clearInterval(setQuery);
+                            console.log(receipt.status);
+                            if (receipt.status == "0x1") { // success
+                                stopSpin();
+                                $("#txstatus").text("Success! See your transaction on explorer")
+                            }
+                            if (receipt.status == "0x0") {
+                                stopSpin();
+                                $("#txstatus").text("Transaction Failed!")
+                            }
+                            $("#csvLoad").text("");
+                        }
+                    }
+                })
+            }
+
+            function spin() {
+                $(".fa").removeClass().addClass('fa fa-cog fa-spin')
+                $("#txstatus").text("waiting for transaction...")
+            }
+
+            function stopSpin() {
+                $(".fa").removeClass().addClass('fa fa-hide')
+            }
+</script>
+
+
+
+</body>
+</html>
