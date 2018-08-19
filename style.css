@@ -1,4 +1,4 @@
-body {margin:0; font-family:"Comic Sans MS", cursive; background-color:#EEEDEC;}
+body {margin:0; font-family:"Comic Sans MS","SimSun" cursive; background-color:#EEEDEC;}
 
 #header {height:150px; background-image:url(images/header_bg.png);}
 #logo {float:left; font-size:36px; padding:38px 0 30px 50px;}
